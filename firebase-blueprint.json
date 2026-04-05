@@ -1,0 +1,94 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User account and safety profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phoneNumber": { "type": "string" },
+        "safetyScore": { "type": "number", "description": "Calculated safety score 0-100" },
+        "emergencyContacts": { 
+          "type": "array", 
+          "items": { "type": "string", "description": "Reference to Contact entity IDs" } 
+        },
+        "lastKnownLocation": {
+          "type": "object",
+          "properties": {
+            "lat": { "type": "number" },
+            "lng": { "type": "number" },
+            "timestamp": { "type": "string", "format": "date-time" }
+          }
+        }
+      },
+      "required": ["uid", "displayName"]
+    },
+    "Contact": {
+      "title": "Trusted Contact",
+      "description": "Emergency contact information",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "relation": { "type": "string" },
+        "isNotifyOnSOS": { "type": "boolean" },
+        "isNotifyOnDeviation": { "type": "boolean" }
+      },
+      "required": ["name", "phoneNumber"]
+    },
+    "Alert": {
+      "title": "Community Alert",
+      "description": "Safety alerts reported by the community",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["danger", "warning", "info"] },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "location": {
+          "type": "object",
+          "properties": {
+            "lat": { "type": "number" },
+            "lng": { "type": "number" }
+          }
+        },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "reportedBy": { "type": "string", "description": "User UID" }
+      },
+      "required": ["type", "title", "location", "timestamp"]
+    },
+    "Trip": {
+      "title": "Journey Tracking",
+      "description": "Active journey tracking data",
+      "type": "object",
+      "properties": {
+        "userUid": { "type": "string" },
+        "startLocation": { "type": "object", "properties": { "lat": { "type": "number" }, "lng": { "type": "number" } } },
+        "destination": { "type": "object", "properties": { "lat": { "type": "number" }, "lng": { "type": "number" } } },
+        "status": { "type": "string", "enum": ["active", "completed", "deviated", "emergency"] },
+        "routePoints": { "type": "array", "items": { "type": "object" } },
+        "startTime": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userUid", "startLocation", "destination", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Individual user profiles"
+    },
+    "/users/{userId}/contacts/{contactId}": {
+      "schema": "Contact",
+      "description": "User's trusted contacts"
+    },
+    "/alerts/{alertId}": {
+      "schema": "Alert",
+      "description": "Global community safety alerts"
+    },
+    "/trips/{tripId}": {
+      "schema": "Trip",
+      "description": "Active and past journeys"
+    }
+  }
+}
