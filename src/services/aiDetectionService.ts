@@ -1,8 +1,3 @@
-import { GoogleGenAI, Type } from "@google/genai";
-
-// Initialize Gemini
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
 export interface ThreatAnalysisResult {
   isThreat: boolean;
   confidence: number;
@@ -12,29 +7,19 @@ export interface ThreatAnalysisResult {
 
 export async function analyzeDistressSignal(audioTranscript: string): Promise<ThreatAnalysisResult> {
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `Analyze the following audio transcript for signs of immediate danger, panic, or distress. 
-      Transcript: "${audioTranscript}"`,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            isThreat: { type: Type.BOOLEAN },
-            confidence: { type: Type.NUMBER },
-            threatType: { 
-              type: Type.STRING, 
-              enum: ['shouting', 'panic', 'distress', 'none'] 
-            },
-            recommendedAction: { type: Type.STRING }
-          },
-          required: ["isThreat", "confidence", "threatType", "recommendedAction"]
-        }
-      }
+    const response = await fetch('/api/ai/analyze-distress', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ audioTranscript })
     });
 
-    return JSON.parse(response.text);
+    if (!response.ok) {
+      throw new Error(`AI distress analysis failed with status ${response.status}`);
+    }
+
+    return await response.json();
   } catch (error) {
     console.error("AI Threat Detection Error:", error);
     return {
@@ -48,12 +33,20 @@ export async function analyzeDistressSignal(audioTranscript: string): Promise<Th
 
 export async function getMultilingualAssistantResponse(query: string, language: string = 'English'): Promise<string> {
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `You are GuardianAI, a personal safety assistant. Respond to the user's query in ${language}.
-      User Query: "${query}"`,
+    const response = await fetch('/api/ai/assistant', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ query, language })
     });
-    return response.text || "I'm sorry, I couldn't process that.";
+
+    if (!response.ok) {
+      throw new Error(`AI assistant request failed with status ${response.status}`);
+    }
+
+    const data = (await response.json()) as { text?: string };
+    return data.text || "I'm sorry, I couldn't process that.";
   } catch (error) {
     console.error("AI Assistant Error:", error);
     return "I'm having trouble connecting right now. Please try again.";
