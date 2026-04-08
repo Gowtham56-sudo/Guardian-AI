@@ -3,6 +3,8 @@ import { Shield, AlertTriangle, Phone, MapPin, Mic, Bell, Settings, User, Heart,
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { recordingService } from '../services/recordingService';
 import { VoiceRecognitionService } from '../services/voiceRecognitionService';
+import { gpsService } from '../services/gpsService';
+import { adminData } from '../utils/adminData';
 
 export default function AppDashboard() {
   const [isSOSActive, setIsSOSActive] = useState(false);
@@ -11,20 +13,65 @@ export default function AppDashboard() {
   const [isRecording, setIsRecording] = useState(false);
   const [isVoiceMonitoring, setIsVoiceMonitoring] = useState(false);
   const voiceServiceRef = useRef<VoiceRecognitionService | null>(null);
+  const sosLocationWatchIdRef = useRef<number | null>(null);
+
+  const stopSOSCapture = useCallback(() => {
+    recordingService.stopAllRecordings();
+    setIsRecording(false);
+
+    if (sosLocationWatchIdRef.current !== null) {
+      gpsService.clearWatch(sosLocationWatchIdRef.current);
+      sosLocationWatchIdRef.current = null;
+    }
+  }, []);
 
   const triggerSOS = useCallback(() => {
     if (!isSOSActive) {
       setIsSOSActive(true);
-      // Auto-start recording on SOS
+      // Auto-start evidence capture for higher officers.
       recordingService.startRecording('video');
+      recordingService.startRecording('audio');
       setIsRecording(true);
+
+      gpsService.getCurrentPosition()
+        .then((position) => {
+          adminData.addLocation(
+            position.coords.latitude,
+            position.coords.longitude,
+            position.coords.accuracy,
+            'gps'
+          );
+        })
+        .catch((error) => {
+          console.error('Unable to capture SOS location:', error);
+        });
+
+      sosLocationWatchIdRef.current = gpsService.watchPosition(
+        (position) => {
+          adminData.addLocation(
+            position.coords.latitude,
+            position.coords.longitude,
+            position.coords.accuracy,
+            'gps'
+          );
+        },
+        (error) => {
+          console.error('Unable to watch SOS location:', error);
+        },
+        { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+      );
+
       console.log('SOS Triggered: Emergency SMS sent to trusted contacts');
     }
   }, [isSOSActive]);
 
   const toggleRecording = () => {
+    if (isSOSActive) {
+      return;
+    }
+
     if (isRecording) {
-      recordingService.stopRecording();
+      recordingService.stopRecording('video');
       setIsRecording(false);
     } else {
       recordingService.startRecording('video');
@@ -97,6 +144,12 @@ export default function AppDashboard() {
     };
   }, [isVoiceMonitoring, triggerSOS]);
 
+  useEffect(() => {
+    return () => {
+      stopSOSCapture();
+    };
+  }, [stopSOSCapture]);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -168,7 +221,14 @@ export default function AppDashboard() {
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          onClick={() => isSOSActive ? setIsSOSActive(false) : triggerSOS()}
+          onClick={() => {
+            if (isSOSActive) {
+              setIsSOSActive(false);
+              stopSOSCapture();
+            } else {
+              triggerSOS();
+            }
+          }}
           aria-label={isSOSActive ? 'Cancel SOS Emergency' : 'Activate SOS Emergency'}
           aria-pressed={isSOSActive}
           className={`relative z-10 flex h-48 w-48 flex-col items-center justify-center rounded-full shadow-2xl transition-colors duration-500 ${

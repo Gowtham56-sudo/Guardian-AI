@@ -2,6 +2,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { MapPin, Navigation, Search, Layers, Compass, ShieldCheck, X, AlertCircle } from 'lucide-react';
 import { useState } from 'react';
 import { getMultilingualAssistantResponse } from '../services/aiDetectionService';
+import { gpsService } from '../services/gpsService';
+import { adminData } from '../utils/adminData';
 
 export default function AppMap() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -13,6 +15,18 @@ export default function AppMap() {
   const startJourney = () => {
     setIsJourneyActive(true);
     setHasDeviation(false);
+    gpsService.getCurrentPosition()
+      .then((position) => {
+        adminData.addLocation(
+          position.coords.latitude,
+          position.coords.longitude,
+          position.coords.accuracy,
+          'gps'
+        );
+      })
+      .catch((error) => {
+        console.error('Unable to capture start location:', error);
+      });
     // Simulate a deviation alert after 10 seconds
     setTimeout(() => {
       if (isJourneyActive) setHasDeviation(true);

@@ -1,4 +1,4 @@
-import { Home, Map, Bell, User, Mic } from 'lucide-react';
+import { Home, Map, Bell, User, Mic, ShieldCheck } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface BottomNavProps {
@@ -12,6 +12,7 @@ export default function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
     { id: 'map', icon: <Map size={24} />, label: 'Map' },
     { id: 'assistant', icon: <Mic size={24} />, label: 'AI' },
     { id: 'alerts', icon: <Bell size={24} />, label: 'Alerts' },
+    { id: 'admin', icon: <ShieldCheck size={24} />, label: 'Admin' },
     { id: 'profile', icon: <User size={24} />, label: 'Profile' },
   ];
 

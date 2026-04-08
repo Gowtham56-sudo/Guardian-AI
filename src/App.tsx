@@ -13,11 +13,12 @@ import AppMap from './pages/AppMap';
 import AppAlerts from './pages/AppAlerts';
 import AppProfile from './pages/AppProfile';
 import AppAssistant from './pages/AppAssistant';
+import AppAdminPanel from './pages/AppAdminPanel';
 import BottomNav from './components/app/BottomNav';
 
 type ViewMode = 'landing' | 'app';
 type Page = 'home' | 'technology' | 'community' | 'about';
-type AppTab = 'home' | 'map' | 'assistant' | 'alerts' | 'profile';
+type AppTab = 'home' | 'map' | 'assistant' | 'alerts' | 'profile' | 'admin';
 
 export default function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('app'); // Default to app mode for the user request
@@ -47,6 +48,8 @@ export default function App() {
         return <AppAlerts />;
       case 'profile':
         return <AppProfile />;
+      case 'admin':
+        return <AppAdminPanel />;
       default:
         return <AppDashboard />;
     }
