@@ -17,7 +17,7 @@ export default function AppMap() {
     setHasDeviation(false);
     gpsService.getCurrentPosition()
       .then((position) => {
-        adminData.addLocation(
+        void adminData.addLocation(
           position.coords.latitude,
           position.coords.longitude,
           position.coords.accuracy,

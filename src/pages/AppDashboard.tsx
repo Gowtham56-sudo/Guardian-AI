@@ -35,7 +35,7 @@ export default function AppDashboard() {
 
       gpsService.getCurrentPosition()
         .then((position) => {
-          adminData.addLocation(
+          void adminData.addLocation(
             position.coords.latitude,
             position.coords.longitude,
             position.coords.accuracy,
@@ -48,7 +48,7 @@ export default function AppDashboard() {
 
       sosLocationWatchIdRef.current = gpsService.watchPosition(
         (position) => {
-          adminData.addLocation(
+          void adminData.addLocation(
             position.coords.latitude,
             position.coords.longitude,
             position.coords.accuracy,

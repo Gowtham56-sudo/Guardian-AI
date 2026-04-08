@@ -1,20 +1,50 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import { MapPin, Mic, Play, ShieldCheck, Trash2, Video } from 'lucide-react';
-import { adminData } from '../utils/adminData';
+import { adminData, type RecordingItem, type LocationItem } from '../utils/adminData';
 import { recordingService } from '../services/recordingService';
 import { gpsService } from '../services/gpsService';
 
+type RecordingWithUrl = RecordingItem & { url: string };
+
 export default function AppAdminPanel() {
   const [refreshKey, setRefreshKey] = useState(0);
+  const [recordings, setRecordings] = useState<RecordingItem[]>([]);
+  const [locations, setLocations] = useState<LocationItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [recordingsWithUrls, setRecordingsWithUrls] = useState<RecordingWithUrl[]>([]);
   const [isAudioRecording, setIsAudioRecording] = useState(false);
   const [captureState, setCaptureState] = useState<'idle' | 'loading' | 'error' | 'done'>('idle');
 
-  const recordings = useMemo(() => adminData.getRecordings(), [refreshKey]);
-  const locations = useMemo(() => adminData.getLocations(), [refreshKey]);
+  useEffect(() => {
+    const loadData = async () => {
+      setIsLoading(true);
+      const [nextRecordings, nextLocations] = await Promise.all([
+        adminData.getRecordings(),
+        adminData.getLocations(),
+      ]);
+      setRecordings(nextRecordings);
+      setLocations(nextLocations);
+      setIsLoading(false);
+    };
 
-  const videoItems = recordings.filter((item) => item.kind === 'video');
-  const audioItems = recordings.filter((item) => item.kind === 'audio');
+    void loadData();
+  }, [refreshKey]);
+
+  useEffect(() => {
+    const next = recordings.map((item) => ({
+      ...item,
+      url: URL.createObjectURL(item.blob),
+    }));
+    setRecordingsWithUrls(next);
+
+    return () => {
+      next.forEach((item) => URL.revokeObjectURL(item.url));
+    };
+  }, [recordings]);
+
+  const videoItems = useMemo(() => recordingsWithUrls.filter((item) => item.kind === 'video'), [recordingsWithUrls]);
+  const audioItems = useMemo(() => recordingsWithUrls.filter((item) => item.kind === 'audio'), [recordingsWithUrls]);
 
   const onStartAudio = async () => {
     await recordingService.startRecording('audio');
@@ -31,7 +61,7 @@ export default function AppAdminPanel() {
     setCaptureState('loading');
     try {
       const position = await gpsService.getCurrentPosition();
-      adminData.addLocation(
+      await adminData.addLocation(
         position.coords.latitude,
         position.coords.longitude,
         position.coords.accuracy,
@@ -79,7 +109,9 @@ export default function AppAdminPanel() {
           </button>
         </div>
 
-        {audioItems.length === 0 ? (
+        {isLoading ? (
+          <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">Loading evidence...</p>
+        ) : audioItems.length === 0 ? (
           <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">No voice clips recorded yet.</p>
         ) : (
           <div className="space-y-3">
@@ -104,8 +136,8 @@ export default function AppAdminPanel() {
             Video Recordings
           </h2>
           <button
-            onClick={() => {
-              adminData.clearRecordings();
+            onClick={async () => {
+              await adminData.clearRecordings();
               setRefreshKey((value) => value + 1);
             }}
             className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600"
@@ -115,7 +147,9 @@ export default function AppAdminPanel() {
           </button>
         </div>
 
-        {videoItems.length === 0 ? (
+        {isLoading ? (
+          <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">Loading evidence...</p>
+        ) : videoItems.length === 0 ? (
           <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">No video clips recorded yet.</p>
         ) : (
           <div className="space-y-3">
@@ -160,7 +194,9 @@ export default function AppAdminPanel() {
           </p>
         )}
 
-        {locations.length === 0 ? (
+        {isLoading ? (
+          <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">Loading evidence...</p>
+        ) : locations.length === 0 ? (
           <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">No locations captured yet.</p>
         ) : (
           <div className="space-y-2">

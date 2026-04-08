@@ -35,9 +35,8 @@ export class RecordingService {
       mediaRecorder.onstop = () => {
         const kindChunks = this.chunks[type] ?? [];
         const blob = new Blob(kindChunks, { type: type === 'video' ? 'video/webm' : 'audio/webm' });
-        const url = URL.createObjectURL(blob);
-        adminData.addRecording(type, url, blob.type || (type === 'video' ? 'video/webm' : 'audio/webm'));
-        console.log(`Recording saved: ${url}`);
+        void adminData.addRecording(type, blob, blob.type || (type === 'video' ? 'video/webm' : 'audio/webm'));
+        console.log(`Recording saved: ${type}`);
         // In a real app, we would upload this to Firebase Storage
         
         // Stop all tracks to release camera/mic for this recording type.

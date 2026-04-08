@@ -3,7 +3,7 @@ export type RecordingKind = 'video' | 'audio';
 export interface RecordingItem {
   id: string;
   kind: RecordingKind;
-  url: string;
+  blob: Blob;
   mimeType: string;
   createdAt: string;
 }
@@ -17,24 +17,68 @@ export interface LocationItem {
   createdAt: string;
 }
 
-const RECORDINGS_KEY = 'guardian-admin-recordings';
-const LOCATIONS_KEY = 'guardian-admin-locations';
+const DB_NAME = 'guardian-admin-db';
+const DB_VERSION = 1;
+const RECORDINGS_STORE = 'recordings';
+const LOCATIONS_STORE = 'locations';
 
-function safeRead<T>(key: string): T[] {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) {
-      return [];
-    }
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as T[]) : [];
-  } catch {
-    return [];
+let dbPromise: Promise<IDBDatabase> | null = null;
+
+function getDb(): Promise<IDBDatabase> {
+  if (dbPromise) {
+    return dbPromise;
   }
+
+  dbPromise = new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(RECORDINGS_STORE)) {
+        db.createObjectStore(RECORDINGS_STORE, { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains(LOCATIONS_STORE)) {
+        db.createObjectStore(LOCATIONS_STORE, { keyPath: 'id' });
+      }
+    };
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error ?? new Error('Failed to open IndexedDB.'));
+  });
+
+  return dbPromise;
 }
 
-function writeList<T>(key: string, items: T[]): void {
-  localStorage.setItem(key, JSON.stringify(items));
+function withStore<T>(
+  storeName: string,
+  mode: IDBTransactionMode,
+  operation: (store: IDBObjectStore) => IDBRequest
+): Promise<T> {
+  return getDb().then((db) => {
+    return new Promise<T>((resolve, reject) => {
+      const tx = db.transaction(storeName, mode);
+      const store = tx.objectStore(storeName);
+      const request = operation(store);
+
+      request.onsuccess = () => resolve(request.result as T);
+      request.onerror = () => reject(request.error ?? new Error('IndexedDB operation failed.'));
+    });
+  });
+}
+
+function withTransaction(storeName: string, mode: IDBTransactionMode, action: (store: IDBObjectStore) => void): Promise<void> {
+  return getDb().then((db) => {
+    return new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(storeName, mode);
+      const store = tx.objectStore(storeName);
+
+      action(store);
+
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error ?? new Error('IndexedDB transaction failed.'));
+      tx.onabort = () => reject(tx.error ?? new Error('IndexedDB transaction aborted.'));
+    });
+  });
 }
 
 function createId(prefix: string): string {
@@ -42,34 +86,34 @@ function createId(prefix: string): string {
 }
 
 export const adminData = {
-  addRecording(kind: RecordingKind, url: string, mimeType: string): RecordingItem {
+  async addRecording(kind: RecordingKind, blob: Blob, mimeType: string): Promise<RecordingItem> {
     const next: RecordingItem = {
       id: createId('rec'),
       kind,
-      url,
+      blob,
       mimeType,
       createdAt: new Date().toISOString(),
     };
-    const items = this.getRecordings();
-    items.unshift(next);
-    writeList(RECORDINGS_KEY, items);
+
+    await withStore<IDBValidKey>(RECORDINGS_STORE, 'readwrite', (store) => store.put(next));
     return next;
   },
 
-  getRecordings(): RecordingItem[] {
-    return safeRead<RecordingItem>(RECORDINGS_KEY);
+  async getRecordings(): Promise<RecordingItem[]> {
+    const items = await withStore<RecordingItem[]>(RECORDINGS_STORE, 'readonly', (store) => store.getAll());
+    return items.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
   },
 
-  clearRecordings(): void {
-    writeList(RECORDINGS_KEY, []);
+  async clearRecordings(): Promise<void> {
+    await withStore<IDBValidKey>(RECORDINGS_STORE, 'readwrite', (store) => store.clear());
   },
 
-  addLocation(
+  async addLocation(
     latitude: number,
     longitude: number,
     accuracy: number,
     source: 'gps' | 'manual' = 'gps'
-  ): LocationItem {
+  ): Promise<LocationItem> {
     const next: LocationItem = {
       id: createId('loc'),
       latitude,
@@ -78,17 +122,19 @@ export const adminData = {
       source,
       createdAt: new Date().toISOString(),
     };
-    const items = this.getLocations();
-    items.unshift(next);
-    writeList(LOCATIONS_KEY, items);
+
+    await withStore<IDBValidKey>(LOCATIONS_STORE, 'readwrite', (store) => store.put(next));
     return next;
   },
 
-  getLocations(): LocationItem[] {
-    return safeRead<LocationItem>(LOCATIONS_KEY);
+  async getLocations(): Promise<LocationItem[]> {
+    const items = await withStore<LocationItem[]>(LOCATIONS_STORE, 'readonly', (store) => store.getAll());
+    return items.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
   },
 
-  clearLocations(): void {
-    writeList(LOCATIONS_KEY, []);
+  async clearLocations(): Promise<void> {
+    await withTransaction(LOCATIONS_STORE, 'readwrite', (store) => {
+      store.clear();
+    });
   },
 };
