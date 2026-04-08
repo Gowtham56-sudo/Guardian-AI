@@ -6,14 +6,62 @@ import { VoiceRecognitionService } from '../services/voiceRecognitionService';
 import { gpsService } from '../services/gpsService';
 import { adminData } from '../utils/adminData';
 
+type SosNotificationLevel = 'info' | 'critical';
+
+interface SosNotification {
+  id: number;
+  title: string;
+  message: string;
+  level: SosNotificationLevel;
+  timestamp: string;
+  isRead: boolean;
+}
+
 export default function AppDashboard() {
   const [isSOSActive, setIsSOSActive] = useState(false);
   const [isFakeCallActive, setIsFakeCallActive] = useState(false);
   const [fakeCallTimer, setFakeCallTimer] = useState<number | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [isVoiceMonitoring, setIsVoiceMonitoring] = useState(false);
+  const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
+  const [notifications, setNotifications] = useState<SosNotification[]>([]);
   const voiceServiceRef = useRef<VoiceRecognitionService | null>(null);
   const sosLocationWatchIdRef = useRef<number | null>(null);
+
+  const pushBrowserNotification = useCallback((title: string, message: string) => {
+    if (!('Notification' in window)) {
+      return;
+    }
+
+    if (Notification.permission === 'granted') {
+      new Notification(title, { body: message, tag: 'guardian-sos' });
+      return;
+    }
+
+    if (Notification.permission === 'default') {
+      void Notification.requestPermission().then((permission) => {
+        if (permission === 'granted') {
+          new Notification(title, { body: message, tag: 'guardian-sos' });
+        }
+      });
+    }
+  }, []);
+
+  const pushSosNotification = useCallback((title: string, message: string, level: SosNotificationLevel = 'info') => {
+    setNotifications((prev) => [
+      {
+        id: Date.now(),
+        title,
+        message,
+        level,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isRead: false,
+      },
+      ...prev,
+    ]);
+
+    pushBrowserNotification(title, message);
+  }, [pushBrowserNotification]);
 
   const stopSOSCapture = useCallback(() => {
     recordingService.stopAllRecordings();
@@ -61,9 +109,15 @@ export default function AppDashboard() {
         { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
       );
 
+      pushSosNotification(
+        'SOS Activated',
+        'Emergency contacts and safety monitoring have been notified.',
+        'critical'
+      );
+
       console.log('SOS Triggered: Emergency SMS sent to trusted contacts');
     }
-  }, [isSOSActive]);
+  }, [isSOSActive, pushSosNotification]);
 
   const toggleRecording = () => {
     if (isSOSActive) {
@@ -88,7 +142,18 @@ export default function AppDashboard() {
 
   const triggerFakeCall = () => {
     setFakeCallTimer(5);
+    pushSosNotification('Fake Call Scheduled', 'A fake call will start in 5 seconds.', 'info');
   };
+
+  const markAllNotificationsRead = () => {
+    setNotifications((prev) => prev.map((notification) => ({ ...notification, isRead: true })));
+  };
+
+  const clearNotifications = () => {
+    setNotifications([]);
+  };
+
+  const unreadCount = notifications.filter((notification) => !notification.isRead).length;
 
   // Shake to SOS logic
   useEffect(() => {
@@ -206,10 +271,81 @@ export default function AppDashboard() {
           <h1 className="text-2xl font-bold text-slate-900">Hello, Guardian</h1>
           <p className="text-slate-500">You are currently protected.</p>
         </div>
-        <div className="h-12 w-12 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden border-2 border-white shadow-sm">
-           <User size={24} className="text-slate-400" />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              setIsNotificationCenterOpen((prev) => !prev);
+              markAllNotificationsRead();
+            }}
+            aria-label="Open SOS notifications"
+            className="relative h-12 w-12 rounded-full bg-white flex items-center justify-center border border-slate-100 shadow-sm"
+          >
+            <Bell size={20} className="text-slate-600" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-5 px-1 h-5 rounded-full bg-red-600 text-white text-[10px] font-bold flex items-center justify-center">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </button>
+          <div className="h-12 w-12 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden border-2 border-white shadow-sm">
+            <User size={24} className="text-slate-400" />
+          </div>
         </div>
       </div>
+
+      <AnimatePresence>
+        {isNotificationCenterOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="rounded-3xl bg-white p-5 shadow-sm border border-slate-100"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold text-slate-900">SOS Notifications</h2>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={markAllNotificationsRead}
+                  className="rounded-xl bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700"
+                >
+                  Mark Read
+                </button>
+                <button
+                  onClick={clearNotifications}
+                  className="rounded-xl bg-red-50 px-3 py-1 text-xs font-semibold text-red-700"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2 max-h-52 overflow-auto">
+              {notifications.length === 0 && (
+                <p className="text-sm text-slate-500">No SOS notifications yet. Trigger SOS to test this sample system.</p>
+              )}
+
+              {notifications.map((notification) => (
+                <div
+                  key={notification.id}
+                  className={`rounded-2xl border p-3 ${
+                    notification.level === 'critical'
+                      ? 'border-red-200 bg-red-50'
+                      : 'border-blue-200 bg-blue-50'
+                  } ${notification.isRead ? 'opacity-70' : ''}`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-bold text-slate-900">{notification.title}</p>
+                      <p className="text-xs text-slate-600 mt-1">{notification.message}</p>
+                    </div>
+                    <span className="text-[10px] font-semibold text-slate-500">{notification.timestamp}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* SOS Button Area */}
       <div className="relative flex flex-col items-center justify-center py-12">
@@ -225,6 +361,7 @@ export default function AppDashboard() {
             if (isSOSActive) {
               setIsSOSActive(false);
               stopSOSCapture();
+              pushSosNotification('SOS Cleared', 'Emergency mode was turned off by the user.', 'info');
             } else {
               triggerSOS();
             }
@@ -335,6 +472,34 @@ export default function AppDashboard() {
         </div>
       </div>
     </div>
+
+      <AnimatePresence>
+        {notifications.length > 0 && !isNotificationCenterOpen && !notifications[0].isRead && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 12 }}
+            className={`fixed left-6 right-6 bottom-28 z-40 rounded-2xl p-4 text-sm shadow-xl border ${
+              notifications[0].level === 'critical'
+                ? 'bg-red-50 border-red-200 text-red-800'
+                : 'bg-blue-50 border-blue-200 text-blue-800'
+            }`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-bold">{notifications[0].title}</p>
+                <p className="text-xs mt-1">{notifications[0].message}</p>
+              </div>
+              <button
+                onClick={markAllNotificationsRead}
+                className="text-xs font-bold rounded-lg px-2 py-1 bg-white/70"
+              >
+                Dismiss
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
   </motion.div>
   );
 }

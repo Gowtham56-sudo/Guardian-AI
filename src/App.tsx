@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'motion/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Navbar from './components/common/Navbar/Navbar';
 import Footer from './components/common/Footer/Footer';
 import Home from './pages/Home/Home';
@@ -19,11 +19,43 @@ import BottomNav from './components/app/BottomNav';
 type ViewMode = 'landing' | 'app';
 type Page = 'home' | 'technology' | 'community' | 'about';
 type AppTab = 'home' | 'map' | 'assistant' | 'alerts' | 'profile' | 'admin';
+type ThemeMode = 'light' | 'dark';
 
 export default function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('app'); // Default to app mode for the user request
   const [currentPage, setCurrentPage] = useState<Page>('home');
   const [activeTab, setActiveTab] = useState<AppTab>('home');
+
+  useEffect(() => {
+    const applyTheme = (themeMode: ThemeMode) => {
+      const root = document.documentElement;
+      root.classList.remove('theme-light', 'theme-dark');
+      root.classList.add(themeMode === 'dark' ? 'theme-dark' : 'theme-light');
+      root.style.colorScheme = themeMode;
+    };
+
+    const storedTheme = window.localStorage.getItem('guardian-theme');
+    applyTheme(storedTheme === 'dark' ? 'dark' : 'light');
+
+    const handleThemeChange = (event: Event) => {
+      const customEvent = event as CustomEvent<ThemeMode>;
+      applyTheme(customEvent.detail === 'dark' ? 'dark' : 'light');
+    };
+
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === 'guardian-theme') {
+        applyTheme(event.newValue === 'dark' ? 'dark' : 'light');
+      }
+    };
+
+    window.addEventListener('guardian-theme-change', handleThemeChange as EventListener);
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('guardian-theme-change', handleThemeChange as EventListener);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
 
   const renderLandingPage = () => {
     switch (currentPage) {
