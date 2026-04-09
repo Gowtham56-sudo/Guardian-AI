@@ -1,4 +1,4 @@
-import { processSosAlert, type SosMessageInput } from "../_lib/sos";
+import { processSosAlert, type SosMessageInput } from "../../lib/sos";
 
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") {
