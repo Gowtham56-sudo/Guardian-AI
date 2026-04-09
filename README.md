@@ -42,3 +42,25 @@ View your app in AI Studio: https://ai.studio/apps/ae0bbc08-7cc4-4293-922b-ff471
 - If smsalert.co WhatsApp settings are not configured, WhatsApp alerts are not delivered.
 - If EmailJS settings are not configured, email alerts are not delivered.
 - The app reports partial delivery when only some channels succeed, and falls back to a simulated success when no configured channel delivers.
+
+## Vercel Deployment Notes
+
+- Deploy the project root (not only the `dist` folder), so Vercel can deploy both frontend and serverless API routes under `api/`.
+- Required Vercel environment variable:
+   - `GEMINI_API_KEY`
+- Optional Vercel environment variables for SOS channels:
+   - `EMAILJS_SERVICE_ID`
+   - `EMAILJS_TEMPLATE_ID`
+   - `EMAILJS_PUBLIC_KEY`
+   - `EMAILJS_PRIVATE_KEY`
+   - `EMAILJS_FROM_NAME`
+   - `SMSALERT_WHATSAPP_API_KEY`
+   - `SMSALERT_WHATSAPP_SENDER_ID`
+   - `SMSALERT_WHATSAPP_ROUTE`
+   - `SMSALERT_WHATSAPP_URL`
+   - `SMSALERT_WHATSAPP_DEFAULT_COUNTRY_CODE`
+   - `SMSALERT_WHATSAPP_TEXT_PARAM`
+   - `SMSALERT_WHATSAPP_APIKEY_PARAM`
+   - `SMSALERT_WHATSAPP_MOBILE_PARAM`
+   - `SMSALERT_WHATSAPP_SENDER_PARAM`
+   - `SMSALERT_WHATSAPP_ROUTE_PARAM`

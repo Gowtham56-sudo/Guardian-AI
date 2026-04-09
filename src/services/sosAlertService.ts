@@ -39,29 +39,57 @@ export async function sendSosAlert(payload: SosAlertPayload): Promise<SosAlertRe
     profile.email,
   ].filter(Boolean);
 
-  const response = await fetch('/api/sos/alert', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      triggerSource: payload.triggerSource,
-      location: payload.coordinates,
-      mapLink: createMapLink(payload.coordinates),
-      userName: profile.fullName,
-      userPhone: profile.phone,
-      recipients: {
-        phones,
-        emails,
-      },
-    }),
-  });
+  try {
+    const response = await fetch('/api/sos/alert', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        triggerSource: payload.triggerSource,
+        location: payload.coordinates,
+        mapLink: createMapLink(payload.coordinates),
+        userName: profile.fullName,
+        userPhone: profile.phone,
+        recipients: {
+          phones,
+          emails,
+        },
+      }),
+    });
 
-  if (!response.ok) {
-    const errorText = await response.text();
+    if (!response.ok) {
+      const errorText = await response.text();
 
-    throw new Error(
-      `Failed to send SOS alert: ${response.status}${errorText ? ` - ${errorText}` : ''}`
-    );
+      if (response.status === 404) {
+        return {
+          ok: true,
+          requestedWhatsappCount: phones.length,
+          requestedEmailCount: emails.length,
+          deliveredWhatsappCount: 0,
+          deliveredEmailCount: 0,
+          simulated: true,
+          diagnostics: [
+            'SOS backend endpoint is unavailable (404). Running in local simulation mode.',
+          ],
+        };
+      }
+
+      throw new Error(
+        `Failed to send SOS alert: ${response.status}${errorText ? ` - ${errorText}` : ''}`
+      );
+    }
+
+    return response.json() as Promise<SosAlertResponse>;
+  } catch (error) {
+    return {
+      ok: true,
+      requestedWhatsappCount: phones.length,
+      requestedEmailCount: emails.length,
+      deliveredWhatsappCount: 0,
+      deliveredEmailCount: 0,
+      simulated: true,
+      diagnostics: [
+        `SOS backend request failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      ],
+    };
   }
-
-  return response.json() as Promise<SosAlertResponse>;
 }
