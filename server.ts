@@ -15,6 +15,17 @@ dotenv.config();
 const geminiApiKey = process.env.GEMINI_API_KEY;
 const ai = geminiApiKey ? new GoogleGenAI({ apiKey: geminiApiKey }) : null;
 
+function isBlockedGeminiKey(error: unknown): boolean {
+  const reason = error instanceof Error ? error.message.toLowerCase() : "";
+  return (
+    reason.includes("api key was reported as leaked") ||
+    reason.includes("permission_denied") ||
+    reason.includes("status\":\"permission_denied") ||
+    reason.includes("code\":403") ||
+    reason.includes("code: 403")
+  );
+}
+
 interface SosAlertRequest {
   triggerSource?: "button" | "shake" | "voice";
   location?: {
@@ -260,6 +271,14 @@ async function startServer() {
 
       return res.json(JSON.parse(response.text));
     } catch (error) {
+      if (isBlockedGeminiKey(error)) {
+        return res.status(403).json({
+          error: "GEMINI_API_KEY_BLOCKED",
+          reason:
+            "Configured Gemini API key is blocked or revoked. Rotate the key in Google AI Studio, then update GEMINI_API_KEY in your deployment environment.",
+        });
+      }
+
       console.error("AI Threat Detection Error:", error);
       return res.status(500).json({
         isThreat: false,
@@ -292,6 +311,16 @@ async function startServer() {
       return res.json({ text: response.text || "I'm sorry, I couldn't process that." });
     } catch (error) {
       const reason = error instanceof Error ? error.message : "Unknown provider error";
+
+      if (isBlockedGeminiKey(error)) {
+        return res.status(403).json({
+          error: "GEMINI_API_KEY_BLOCKED",
+          reason:
+            "Configured Gemini API key is blocked or revoked. Rotate the key in Google AI Studio, then update GEMINI_API_KEY in your deployment environment.",
+          providerReason: reason,
+        });
+      }
+
       console.error("AI Assistant Error:", error);
       return res.status(502).json({
         error: "AI assistant provider request failed",

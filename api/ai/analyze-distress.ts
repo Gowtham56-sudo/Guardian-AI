@@ -1,5 +1,16 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
+function isBlockedGeminiKey(error: unknown): boolean {
+  const reason = error instanceof Error ? error.message.toLowerCase() : "";
+  return (
+    reason.includes("api key was reported as leaked") ||
+    reason.includes("permission_denied") ||
+    reason.includes("status\":\"permission_denied") ||
+    reason.includes("code\":403") ||
+    reason.includes("code: 403")
+  );
+}
+
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -44,7 +55,15 @@ export default async function handler(req: any, res: any) {
     }
 
     return res.status(200).json(JSON.parse(response.text));
-  } catch {
+  } catch (error) {
+    if (isBlockedGeminiKey(error)) {
+      return res.status(403).json({
+        error: "GEMINI_API_KEY_BLOCKED",
+        reason:
+          "Configured Gemini API key is blocked or revoked. Rotate the key in Google AI Studio, then update GEMINI_API_KEY in your deployment environment.",
+      });
+    }
+
     return res.status(500).json({
       isThreat: false,
       confidence: 0,

@@ -64,3 +64,14 @@ View your app in AI Studio: https://ai.studio/apps/ae0bbc08-7cc4-4293-922b-ff471
    - `SMSALERT_WHATSAPP_MOBILE_PARAM`
    - `SMSALERT_WHATSAPP_SENDER_PARAM`
    - `SMSALERT_WHATSAPP_ROUTE_PARAM`
+
+## Gemini API key blocked (403 PERMISSION_DENIED)
+
+If you see an error like "Your API key was reported as leaked", that key has been blocked by Google and cannot be reused.
+
+1. Revoke/delete the compromised key in Google AI Studio.
+2. Create a new Gemini API key.
+3. Update `GEMINI_API_KEY` in your deployment environment (for Vercel: Project Settings -> Environment Variables).
+4. Redeploy so serverless functions pick up the new key.
+
+Never commit real secrets into repository files such as `.env.example`.
