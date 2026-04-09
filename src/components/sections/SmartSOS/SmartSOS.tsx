@@ -14,7 +14,7 @@ export default function SmartSOS() {
         <ul className="space-y-3 text-slate-700" aria-label="Smart SOS features">
           <li className="flex items-center gap-3">
             <div className="h-2 w-2 rounded-full bg-blue-700" aria-hidden="true" />
-            Automated SMS alerts with Google Maps links
+            Automated WhatsApp alerts with Google Maps links
           </li>
           <li className="flex items-center gap-3">
             <div className="h-2 w-2 rounded-full bg-blue-700" aria-hidden="true" />

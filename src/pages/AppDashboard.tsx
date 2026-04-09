@@ -5,6 +5,7 @@ import { recordingService } from '../services/recordingService';
 import { VoiceRecognitionService } from '../services/voiceRecognitionService';
 import { gpsService } from '../services/gpsService';
 import { adminData } from '../utils/adminData';
+import { sendSosAlert } from '../services/sosAlertService';
 
 type SosNotificationLevel = 'info' | 'critical';
 
@@ -17,7 +18,11 @@ interface SosNotification {
   isRead: boolean;
 }
 
-export default function AppDashboard() {
+interface AppDashboardProps {
+  onOpenMap?: () => void;
+}
+
+export default function AppDashboard({ onOpenMap }: AppDashboardProps) {
   const [isSOSActive, setIsSOSActive] = useState(false);
   const [isFakeCallActive, setIsFakeCallActive] = useState(false);
   const [fakeCallTimer, setFakeCallTimer] = useState<number | null>(null);
@@ -25,6 +30,7 @@ export default function AppDashboard() {
   const [isVoiceMonitoring, setIsVoiceMonitoring] = useState(false);
   const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
   const [notifications, setNotifications] = useState<SosNotification[]>([]);
+  const [shareTripEnabled, setShareTripEnabled] = useState(true);
   const voiceServiceRef = useRef<VoiceRecognitionService | null>(null);
   const sosLocationWatchIdRef = useRef<number | null>(null);
 
@@ -73,7 +79,97 @@ export default function AppDashboard() {
     }
   }, []);
 
-  const triggerSOS = useCallback(() => {
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadFeatureOptions = async () => {
+      const options = await adminData.getFeatureOptions();
+      if (isMounted) {
+        setShareTripEnabled(options.shareTripEnabled);
+      }
+    };
+
+    const onOptionsChange = (event: Event) => {
+      const customEvent = event as CustomEvent<{ shareTripEnabled?: boolean }>;
+      if (typeof customEvent.detail?.shareTripEnabled === 'boolean') {
+        setShareTripEnabled(customEvent.detail.shareTripEnabled);
+      } else {
+        void loadFeatureOptions();
+      }
+    };
+
+    void loadFeatureOptions();
+    window.addEventListener('guardian-admin-option-change', onOptionsChange as EventListener);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('guardian-admin-option-change', onOptionsChange as EventListener);
+    };
+  }, []);
+
+  const handleShareTrip = useCallback(() => {
+    if (!shareTripEnabled) {
+      pushSosNotification(
+        'Share Trip Disabled',
+        'This option is disabled in Admin Panel feature controls.',
+        'info'
+      );
+      return;
+    }
+
+    if (onOpenMap) {
+      onOpenMap();
+      return;
+    }
+
+    console.log('Share Trip requested');
+  }, [onOpenMap, pushSosNotification, shareTripEnabled]);
+
+  const formatDeliveryMessage = useCallback((result: {
+    requestedWhatsappCount: number;
+    requestedEmailCount: number;
+    deliveredWhatsappCount: number;
+    deliveredEmailCount: number;
+    simulated: boolean;
+    diagnostics?: string[];
+  }): string => {
+    const delivered = `${result.deliveredWhatsappCount} WhatsApp, ${result.deliveredEmailCount} email`;
+    const requested = `${result.requestedWhatsappCount} WhatsApp, ${result.requestedEmailCount} email`;
+    const diagnosticsText = result.diagnostics && result.diagnostics.length > 0
+      ? ` Reason: ${result.diagnostics.slice(0, 2).join(' | ')}`
+      : '';
+
+    if (!result.simulated) {
+      return `Delivered: ${delivered}.`;
+    }
+
+    if (result.deliveredWhatsappCount === 0 && result.deliveredEmailCount === 0) {
+      return `Local demo only: no WhatsApp or email was delivered (requested ${requested}). Configure WhatsApp/email providers for real delivery.${diagnosticsText}`;
+    }
+
+    return `Partial delivery: ${delivered} (requested ${requested}). Configure WhatsApp/email providers for full delivery.${diagnosticsText}`;
+  }, []);
+
+  const getDeliveryTitle = useCallback((result: {
+    requestedWhatsappCount: number;
+    requestedEmailCount: number;
+    deliveredWhatsappCount: number;
+    deliveredEmailCount: number;
+    simulated: boolean;
+    diagnostics?: string[];
+  }): string => {
+    if (!result.simulated) {
+      return 'SOS Alert Sent';
+    }
+
+    if (result.deliveredWhatsappCount === 0 && result.deliveredEmailCount === 0) {
+      return 'SOS Alert Logged Locally';
+    }
+
+    return 'SOS Alert Partially Sent';
+  }, []);
+
+  const triggerSOS = useCallback((triggerSource: 'button' | 'shake' | 'voice' = 'button') => {
     if (!isSOSActive) {
       setIsSOSActive(true);
       // Auto-start evidence capture for higher officers.
@@ -89,9 +185,50 @@ export default function AppDashboard() {
             position.coords.accuracy,
             'gps'
           );
+
+          void sendSosAlert({
+            triggerSource,
+            coordinates: {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracy: position.coords.accuracy,
+            },
+          })
+            .then((result) => {
+              pushSosNotification(
+                getDeliveryTitle(result),
+                formatDeliveryMessage(result),
+                'critical'
+              );
+            })
+            .catch((error) => {
+              console.error('Unable to send SOS alerts:', error);
+              pushSosNotification(
+                'SOS Alert Failed',
+                'Could not deliver parent or email alerts. Please call emergency services directly.',
+                'critical'
+              );
+            });
         })
         .catch((error) => {
           console.error('Unable to capture SOS location:', error);
+
+          void sendSosAlert({ triggerSource })
+            .then((result) => {
+              pushSosNotification(
+                getDeliveryTitle(result),
+                formatDeliveryMessage(result),
+                'critical'
+              );
+            })
+            .catch((alertError) => {
+              console.error('Unable to send SOS alerts:', alertError);
+              pushSosNotification(
+                'SOS Alert Failed',
+                'Could not deliver parent or email alerts. Please call emergency services directly.',
+                'critical'
+              );
+            });
         });
 
       sosLocationWatchIdRef.current = gpsService.watchPosition(
@@ -111,13 +248,13 @@ export default function AppDashboard() {
 
       pushSosNotification(
         'SOS Activated',
-        'Emergency contacts and safety monitoring have been notified.',
+        'Emergency monitoring started. Sending alerts to parents and email recipients.',
         'critical'
       );
 
-      console.log('SOS Triggered: Emergency SMS sent to trusted contacts');
+      console.log('SOS Triggered: Parent and email alerts dispatched.');
     }
-  }, [isSOSActive, pushSosNotification]);
+  }, [formatDeliveryMessage, getDeliveryTitle, isSOSActive, pushSosNotification]);
 
   const toggleRecording = () => {
     if (isSOSActive) {
@@ -136,8 +273,13 @@ export default function AppDashboard() {
   const quickActions = [
     { icon: <Phone size={24} aria-hidden="true" />, label: 'Fake Call', color: 'bg-amber-100 text-amber-800', onClick: () => triggerFakeCall() },
     { icon: isRecording ? <Video size={24} aria-hidden="true" className="animate-pulse" /> : <Mic size={24} aria-hidden="true" />, label: isRecording ? 'Recording...' : 'Record', color: isRecording ? 'bg-red-600 text-white' : 'bg-red-100 text-red-800', onClick: () => toggleRecording() },
-    { icon: <MapPin size={24} aria-hidden="true" />, label: 'Share Trip', color: 'bg-blue-100 text-blue-800', onClick: () => console.log('Sharing...') },
-    { icon: <Zap size={24} aria-hidden="true" />, label: 'Quick SOS', color: 'bg-purple-100 text-purple-800', onClick: () => triggerSOS() },
+    {
+      icon: <MapPin size={24} aria-hidden="true" />,
+      label: shareTripEnabled ? 'Share Trip' : 'Share Trip Off',
+      color: shareTripEnabled ? 'bg-blue-100 text-blue-800' : 'bg-slate-200 text-slate-500',
+      onClick: handleShareTrip,
+    },
+    { icon: <Zap size={24} aria-hidden="true" />, label: 'Quick SOS', color: 'bg-purple-100 text-purple-800', onClick: () => triggerSOS('button') },
   ];
 
   const triggerFakeCall = () => {
@@ -169,7 +311,7 @@ export default function AppDashboard() {
           const deltaZ = Math.abs(z - lastZ);
 
           if ((deltaX > threshold && deltaY > threshold) || (deltaX > threshold && deltaZ > threshold) || (deltaY > threshold && deltaZ > threshold)) {
-            triggerSOS();
+            triggerSOS('shake');
           }
         }
         lastX = x; lastY = y; lastZ = z;
@@ -194,7 +336,7 @@ export default function AppDashboard() {
   useEffect(() => {
     if (!voiceServiceRef.current) {
       voiceServiceRef.current = new VoiceRecognitionService(() => {
-        triggerSOS();
+        triggerSOS('voice');
       });
     }
 

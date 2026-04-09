@@ -17,10 +17,19 @@ export interface LocationItem {
   createdAt: string;
 }
 
+export interface AdminFeatureOptions {
+  shareTripEnabled: boolean;
+}
+
 const DB_NAME = 'guardian-admin-db';
 const DB_VERSION = 1;
 const RECORDINGS_STORE = 'recordings';
 const LOCATIONS_STORE = 'locations';
+const FEATURE_OPTIONS_KEY = 'guardian-admin-feature-options';
+
+const DEFAULT_FEATURE_OPTIONS: AdminFeatureOptions = {
+  shareTripEnabled: true,
+};
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -136,5 +145,35 @@ export const adminData = {
     await withTransaction(LOCATIONS_STORE, 'readwrite', (store) => {
       store.clear();
     });
+  },
+
+  async getFeatureOptions(): Promise<AdminFeatureOptions> {
+    try {
+      const raw = window.localStorage.getItem(FEATURE_OPTIONS_KEY);
+      if (!raw) {
+        return DEFAULT_FEATURE_OPTIONS;
+      }
+
+      const parsed = JSON.parse(raw) as Partial<AdminFeatureOptions>;
+      return {
+        shareTripEnabled:
+          typeof parsed.shareTripEnabled === 'boolean'
+            ? parsed.shareTripEnabled
+            : DEFAULT_FEATURE_OPTIONS.shareTripEnabled,
+      };
+    } catch {
+      return DEFAULT_FEATURE_OPTIONS;
+    }
+  },
+
+  async setFeatureOptions(next: Partial<AdminFeatureOptions>): Promise<AdminFeatureOptions> {
+    const current = await this.getFeatureOptions();
+    const merged: AdminFeatureOptions = {
+      ...current,
+      ...next,
+    };
+
+    window.localStorage.setItem(FEATURE_OPTIONS_KEY, JSON.stringify(merged));
+    return merged;
   },
 };

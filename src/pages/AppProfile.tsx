@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { User, Shield, Bell, Lock, Eye, LogOut, ChevronRight, Heart, Smartphone, X } from 'lucide-react';
+import { emergencyContactService, type EmergencyContact } from '../services/emergencyContactService';
 
 type SettingsPanel = 'personal' | 'notifications' | 'wearable' | 'privacy' | 'appearance' | null;
 type ThemeMode = 'light' | 'dark';
@@ -12,21 +13,14 @@ interface WearableDevice {
 }
 
 export default function AppProfile() {
-  const [profileName, setProfileName] = useState('John Doe');
+  const [profileName, setProfileName] = useState(() => emergencyContactService.getProfile().fullName);
   const [statusMessage, setStatusMessage] = useState('');
   const [isAddContactOpen, setIsAddContactOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [activeSettingsPanel, setActiveSettingsPanel] = useState<SettingsPanel>(null);
-  const [contacts, setContacts] = useState([
-    { name: 'Dad', phone: '+1 (555) 000-1234', relation: 'Father' },
-    { name: 'Mom', phone: '+1 (555) 000-5678', relation: 'Mother' },
-  ]);
-  const [newContact, setNewContact] = useState({ name: '', relation: '', phone: '' });
-  const [personalInfo, setPersonalInfo] = useState({
-    fullName: 'John Doe',
-    email: 'john.doe@guardian.ai',
-    phone: '+1 (555) 111-2233',
-  });
+  const [contacts, setContacts] = useState<EmergencyContact[]>(() => emergencyContactService.getEmergencyContacts());
+  const [newContact, setNewContact] = useState({ name: '', relation: '', phone: '', email: '' });
+  const [personalInfo, setPersonalInfo] = useState(() => emergencyContactService.getProfile());
   const [notificationSettings, setNotificationSettings] = useState({
     push: true,
     sms: true,
@@ -97,6 +91,11 @@ export default function AppProfile() {
       applyThemePreference(appearanceSettings.themeMode);
     }
 
+    if (activeSettingsPanel === 'personal') {
+      emergencyContactService.setProfile(personalInfo);
+      setProfileName(personalInfo.fullName.trim() || profileName);
+    }
+
     setStatusMessage(`${panelName} updated successfully.`);
     closeSettingsPanel();
   };
@@ -163,26 +162,31 @@ export default function AppProfile() {
 
     setProfileName(trimmedName);
     setPersonalInfo((prev) => ({ ...prev, fullName: trimmedName }));
+    emergencyContactService.setProfile({ fullName: trimmedName });
     setStatusMessage('Profile name updated successfully.');
   };
 
   const handleAddContact = () => {
-    const { name, relation, phone } = newContact;
+    const { name, relation, phone, email } = newContact;
     if (!name.trim() || !relation.trim() || !phone.trim()) {
       setStatusMessage('Please fill in all contact fields.');
       return;
     }
 
-    setContacts((prev) => [
-      ...prev,
+    const nextContacts = [
+      ...contacts,
       {
         name: name.trim(),
         relation: relation.trim(),
         phone: phone.trim(),
+        email: email.trim(),
       },
-    ]);
+    ];
 
-    setNewContact({ name: '', relation: '', phone: '' });
+    setContacts(nextContacts);
+    emergencyContactService.setEmergencyContacts(nextContacts);
+
+    setNewContact({ name: '', relation: '', phone: '', email: '' });
     setIsAddContactOpen(false);
     setStatusMessage('Trusted contact added successfully.');
   };
@@ -305,6 +309,7 @@ export default function AppProfile() {
                 <div>
                   <p className="text-sm font-bold text-slate-800">{contact.name}</p>
                   <p className="text-[10px] text-slate-500">{contact.relation} • {contact.phone}</p>
+                  {contact.email && <p className="text-[10px] text-slate-400">{contact.email}</p>}
                 </div>
               </div>
               <button
@@ -408,6 +413,12 @@ export default function AppProfile() {
                   placeholder="Phone Number"
                   className="w-full rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm outline-none focus:ring-2 focus:ring-blue-500/20"
                 />
+                <input
+                  value={newContact.email}
+                  onChange={(event) => setNewContact((prev) => ({ ...prev, email: event.target.value }))}
+                  placeholder="Email (optional)"
+                  className="w-full rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm outline-none focus:ring-2 focus:ring-blue-500/20"
+                />
               </div>
 
               <div className="flex gap-3">
@@ -494,7 +505,7 @@ export default function AppProfile() {
                     />
                   </label>
                   <label className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                    SMS Alerts
+                    WhatsApp Alerts
                     <input
                       type="checkbox"
                       checked={notificationSettings.sms}

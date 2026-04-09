@@ -83,7 +83,7 @@ export default function App() {
       case 'admin':
         return <AppAdminPanel />;
       default:
-        return <AppDashboard />;
+        return <AppDashboard onOpenMap={() => setActiveTab('map')} />;
     }
   };
 
