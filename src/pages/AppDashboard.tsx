@@ -31,6 +31,7 @@ export default function AppDashboard({ onOpenMap }: AppDashboardProps) {
   const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
   const [notifications, setNotifications] = useState<SosNotification[]>([]);
   const [shareTripEnabled, setShareTripEnabled] = useState(true);
+  const [selectedLanguage, setSelectedLanguage] = useState('en-US');
   const voiceServiceRef = useRef<VoiceRecognitionService | null>(null);
   const sosLocationWatchIdRef = useRef<number | null>(null);
 
@@ -334,26 +335,39 @@ export default function AppDashboard({ onOpenMap }: AppDashboardProps) {
 
   // Voice Recognition Setup
   useEffect(() => {
-    if (!voiceServiceRef.current) {
-      voiceServiceRef.current = new VoiceRecognitionService(() => {
+    // Re-initialize if language changes
+    if (voiceServiceRef.current) {
+      const wasActive = isVoiceMonitoring;
+      voiceServiceRef.current.stop();
+      voiceServiceRef.current = new VoiceRecognitionService((threatType) => {
         triggerSOS('voice');
-      });
+        pushSosNotification('AI Voice SOS', `Distress detected (${threatType})`, 'critical');
+      }, selectedLanguage);
+      if (wasActive) {
+        voiceServiceRef.current.start();
+      }
+    } else {
+      voiceServiceRef.current = new VoiceRecognitionService((threatType) => {
+        triggerSOS('voice');
+        pushSosNotification('AI Voice SOS', `Distress detected (${threatType})`, 'critical');
+      }, selectedLanguage);
     }
+  }, [selectedLanguage]);
+
+  useEffect(() => {
+    if (!voiceServiceRef.current) return;
 
     if (isVoiceMonitoring) {
       voiceServiceRef.current.start();
     } else {
       voiceServiceRef.current.stop();
     }
-
-    return () => {
-      voiceServiceRef.current?.stop();
-    };
-  }, [isVoiceMonitoring, triggerSOS]);
+  }, [isVoiceMonitoring]);
 
   useEffect(() => {
     return () => {
       stopSOSCapture();
+      voiceServiceRef.current?.stop();
     };
   }, [stopSOSCapture]);
 
@@ -410,8 +424,8 @@ export default function AppDashboard({ onOpenMap }: AppDashboardProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Hello, Guardian</h1>
-          <p className="text-slate-500">You are currently protected.</p>
+          <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-slate-900 to-slate-600">Hello, Guardian</h1>
+          <p className="text-slate-500 font-medium mt-1">You are currently protected.</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -441,7 +455,7 @@ export default function AppDashboard({ onOpenMap }: AppDashboardProps) {
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="rounded-3xl bg-white p-5 shadow-sm border border-slate-100"
+            className="rounded-3xl bg-white/80 backdrop-blur-xl p-5 shadow-xl shadow-slate-200/50 border border-white"
           >
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-bold text-slate-900">SOS Notifications</h2>
@@ -510,12 +524,14 @@ export default function AppDashboard({ onOpenMap }: AppDashboardProps) {
           }}
           aria-label={isSOSActive ? 'Cancel SOS Emergency' : 'Activate SOS Emergency'}
           aria-pressed={isSOSActive}
-          className={`relative z-10 flex h-48 w-48 flex-col items-center justify-center rounded-full shadow-2xl transition-colors duration-500 ${
-            isSOSActive ? 'bg-red-600 shadow-red-200' : 'bg-blue-600 shadow-blue-200'
+          className={`relative z-10 flex h-48 w-48 flex-col items-center justify-center rounded-full shadow-2xl transition-all duration-500 ${
+            isSOSActive 
+              ? 'bg-gradient-to-br from-red-500 to-rose-600 shadow-red-500/50 scale-105' 
+              : 'bg-gradient-to-br from-blue-500 to-indigo-600 shadow-blue-500/40'
           }`}
         >
-          <Shield size={64} className="text-white mb-2" aria-hidden="true" />
-          <span className="text-xl font-bold text-white uppercase tracking-widest">
+          <Shield size={64} className="text-white mb-2 drop-shadow-md" aria-hidden="true" />
+          <span className="text-2xl font-extrabold text-white uppercase tracking-widest drop-shadow-md">
             {isSOSActive ? 'Active' : 'SOS'}
           </span>
         </motion.button>
@@ -544,12 +560,14 @@ export default function AppDashboard({ onOpenMap }: AppDashboardProps) {
         {quickActions.map((action, index) => (
           <motion.button
             key={index}
-            whileHover={{ y: -4 }}
+            whileHover={{ y: -4, scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             aria-label={action.label}
             onClick={action.onClick}
-            className={`flex flex-col items-center gap-3 rounded-3xl p-6 shadow-sm border border-slate-100 transition-colors ${
-              action.label === 'Recording...' ? 'bg-red-50 border-red-200' : 'bg-white'
+            className={`flex flex-col items-center gap-3 rounded-3xl p-6 shadow-xl border transition-all ${
+              action.label === 'Recording...' 
+                ? 'bg-red-50/80 backdrop-blur-xl border-red-200 shadow-red-500/10' 
+                : 'bg-white/60 backdrop-blur-xl border-white shadow-slate-200/40 hover:bg-white/80'
             }`}
           >
             <div className={`rounded-2xl p-4 ${action.color}`}>
@@ -564,7 +582,7 @@ export default function AppDashboard({ onOpenMap }: AppDashboardProps) {
 
       {/* Voice Monitor & Status */}
       <div className="grid grid-cols-1 gap-4">
-        <div className={`rounded-3xl p-6 shadow-sm border transition-all ${isVoiceMonitoring ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-100'}`}>
+        <div className={`rounded-3xl p-6 shadow-xl border transition-all duration-300 ${isVoiceMonitoring ? 'bg-blue-50/80 backdrop-blur-xl border-blue-200 shadow-blue-500/10' : 'bg-white/60 backdrop-blur-xl border-white shadow-slate-200/40'}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${isVoiceMonitoring ? 'bg-blue-600 text-white animate-pulse' : 'bg-slate-100 text-slate-500'}`}>
@@ -582,9 +600,26 @@ export default function AppDashboard({ onOpenMap }: AppDashboardProps) {
               <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isVoiceMonitoring ? 'translate-x-6' : 'translate-x-1'}`} />
             </button>
           </div>
+          <div className="mt-4 pt-4 border-t border-slate-200/50 flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-600">Language (Gemini AI)</span>
+            <select
+              value={selectedLanguage}
+              onChange={(e) => setSelectedLanguage(e.target.value)}
+              disabled={isVoiceMonitoring}
+              className="text-xs bg-slate-100 border border-slate-200 rounded-lg px-2 py-1 outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+            >
+              <option value="en-US">English (US)</option>
+              <option value="es-ES">Español (Spain)</option>
+              <option value="fr-FR">Français (France)</option>
+              <option value="hi-IN">Hindi (India)</option>
+              <option value="ta-IN">Tamil (India)</option>
+              <option value="zh-CN">Chinese (Simplified)</option>
+              <option value="ar-SA">Arabic</option>
+            </select>
+          </div>
         </div>
 
-        <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100 space-y-4" aria-live="polite">
+        <div className="rounded-3xl bg-white/60 backdrop-blur-xl p-6 shadow-xl shadow-slate-200/40 border border-white space-y-4" aria-live="polite">
         <div className="flex items-center justify-between">
           <h2 className="font-bold text-slate-900 text-base">Safety Status</h2>
           <span className="flex items-center gap-1 text-xs font-bold text-green-700 bg-green-50 px-2 py-1 rounded-full">

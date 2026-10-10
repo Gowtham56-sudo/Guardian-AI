@@ -1,5 +1,24 @@
-import { Navigation, MapPin } from 'lucide-react';
+import { Navigation } from 'lucide-react';
+import { MapContainer, TileLayer, Marker, Circle, Popup } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
+// Fix Leaflet's default icon issue
+import iconUrl from 'leaflet/dist/images/marker-icon.png';
+import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
+import shadowUrl from 'leaflet/dist/images/marker-shadow.png';
+
+const DefaultIcon = L.icon({
+  iconUrl,
+  iconRetinaUrl,
+  shadowUrl,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  tooltipAnchor: [16, -28],
+  shadowSize: [41, 41]
+});
+L.Marker.prototype.options.icon = DefaultIcon;
 export default function SafeNavigation() {
   return (
     <section className="flex flex-col items-center gap-12 md:flex-row-reverse py-12">
@@ -22,12 +41,37 @@ export default function SafeNavigation() {
           </li>
         </ul>
       </div>
-      <div className="flex-1 rounded-3xl bg-slate-200/50 p-8">
-        <div className="aspect-video rounded-2xl bg-white shadow-inner relative overflow-hidden">
-          <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#3b82f6_1px,transparent_1px)] [background-size:20px_20px]" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-            <MapPin className="text-blue-600 animate-bounce" size={48} />
-          </div>
+      <div className="flex-1 rounded-3xl bg-slate-800/50 p-6 md:p-8 backdrop-blur-xl border border-white/10 shadow-2xl shadow-blue-900/20">
+        <div className="aspect-video rounded-2xl bg-white shadow-inner relative overflow-hidden z-0 border border-white/20">
+          <MapContainer 
+            center={[40.7128, -74.0060]} 
+            zoom={13} 
+            scrollWheelZoom={false}
+            className="h-full w-full"
+          >
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+            {/* User Location Marker */}
+            <Marker position={[40.7128, -74.0060]}>
+              <Popup>Current Location</Popup>
+            </Marker>
+            <Circle 
+              center={[40.7128, -74.0060]}
+              radius={1000}
+              pathOptions={{ fillColor: '#3b82f6', color: '#2563eb', weight: 1, fillOpacity: 0.1 }}
+            />
+            {/* Safe Zone Marker */}
+            <Marker position={[40.7200, -73.9900]}>
+              <Popup>Verified Safe Zone</Popup>
+            </Marker>
+            <Circle 
+              center={[40.7200, -73.9900]}
+              radius={300}
+              pathOptions={{ fillColor: '#10b981', color: '#059669', weight: 1, fillOpacity: 0.2 }}
+            />
+          </MapContainer>
         </div>
       </div>
     </section>

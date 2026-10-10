@@ -115,7 +115,10 @@ export default function AppAlerts() {
                 </div>
 
                 <div className="flex gap-3">
-                  <button className="flex-1 flex items-center justify-center gap-2 py-4 rounded-2xl bg-slate-100 text-slate-700 font-bold text-sm">
+                  <button 
+                    onClick={() => window.alert('Camera/Gallery opening...')}
+                    className="flex-1 flex items-center justify-center gap-2 py-4 rounded-2xl bg-slate-100 text-slate-700 font-bold text-sm"
+                  >
                     <Camera size={18} />
                     Add Photo
                   </button>
@@ -177,10 +180,16 @@ export default function AppAlerts() {
               {alert.description}
             </p>
             <div className="flex gap-2 pt-2">
-              <button className="flex-1 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold hover:bg-slate-200 transition-colors">
+              <button 
+                onClick={() => window.alert('Verifying incident...')}
+                className="flex-1 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold hover:bg-slate-200 transition-colors"
+              >
                 Ignore
               </button>
-              <button className="flex-1 py-2 rounded-xl bg-blue-700 text-white text-xs font-bold hover:bg-blue-800 transition-colors">
+              <button 
+                onClick={() => window.alert('Sharing incident details...')}
+                className="flex-1 py-2 rounded-xl bg-blue-700 text-white text-xs font-bold hover:bg-blue-800 transition-colors"
+              >
                 I'm Safe
               </button>
             </div>

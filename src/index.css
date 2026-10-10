@@ -4,6 +4,12 @@
 	color-scheme: light;
 }
 
+body {
+    font-family: 'Outfit', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
 html.theme-dark {
 	color-scheme: dark;
 }

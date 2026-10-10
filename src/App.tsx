@@ -89,14 +89,14 @@ export default function App() {
 
   if (viewMode === 'app') {
     return (
-      <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-blue-100 selection:text-blue-900">
-        {/* App Header (Minimal) */}
-        <header className="sticky top-0 z-40 bg-slate-50/80 backdrop-blur-md px-6 py-4 flex items-center justify-between">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-purple-50/30 font-sans text-slate-900 selection:bg-blue-200 selection:text-blue-900">
+        {/* App Header (Premium Glassmorphism) */}
+        <header className="sticky top-0 z-40 bg-white/50 backdrop-blur-xl border-b border-white/80 px-6 py-4 flex items-center justify-between shadow-sm shadow-blue-900/5">
            <div className="flex items-center gap-2">
-             <div className="h-8 w-8 rounded-lg bg-blue-700 flex items-center justify-center text-white shadow-lg shadow-blue-100" aria-hidden="true">
-               <span className="font-bold text-sm">G</span>
+             <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white shadow-lg shadow-blue-500/30 border border-blue-400/20" aria-hidden="true">
+               <span className="font-bold text-sm tracking-tighter">G</span>
              </div>
-             <span className="font-bold tracking-tight">GuardianAI</span>
+             <span className="font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-slate-800 to-slate-600">GuardianAI</span>
            </div>
            <button 
              onClick={() => setViewMode('landing')}
@@ -127,16 +127,21 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-blue-100 selection:text-blue-900">
-      <Navbar currentPage={currentPage} onPageChange={setCurrentPage} />
+    <div className="min-h-screen bg-slate-900 font-sans text-slate-100 selection:bg-blue-500/30 selection:text-white relative overflow-hidden">
+      {/* Animated Background Mesh */}
+      <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-blue-600/30 rounded-full blur-[120px] mix-blend-screen animate-pulse" aria-hidden="true" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-purple-600/20 rounded-full blur-[120px] mix-blend-screen" aria-hidden="true" />
+      
+      <div className="relative z-10">
+        <Navbar currentPage={currentPage} onPageChange={setCurrentPage} />
 
-      <main className="mx-auto max-w-4xl px-6 py-20 md:py-32 overflow-hidden" role="main">
-        <div className="mb-12 flex justify-center">
-          <button 
-            onClick={() => setViewMode('app')}
-            aria-label="Launch Guardian Safety App"
-            className="group relative inline-flex items-center gap-2 rounded-full bg-blue-700 px-8 py-4 text-lg font-bold text-white shadow-xl shadow-blue-200 transition-all hover:bg-blue-800 hover:shadow-blue-300 active:scale-95"
-          >
+        <main className="mx-auto max-w-5xl px-6 py-20 md:py-32" role="main">
+          <div className="mb-16 flex justify-center">
+            <button 
+              onClick={() => setViewMode('app')}
+              aria-label="Launch Guardian Safety App"
+              className="group relative inline-flex items-center gap-3 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 px-10 py-5 text-xl font-bold text-white shadow-2xl shadow-blue-500/25 transition-all hover:scale-105 hover:shadow-blue-500/40 active:scale-95"
+            >
             Launch Guardian App
             <motion.div
               animate={{ x: [0, 5, 0] }}
@@ -149,11 +154,11 @@ export default function App() {
         </div>
 
         <AnimatePresence mode="wait">
-          {renderLandingPage()}
-        </AnimatePresence>
-      </main>
+          </AnimatePresence>
+        </main>
 
-      <Footer />
+        <Footer />
+      </div>
     </div>
   );
 }

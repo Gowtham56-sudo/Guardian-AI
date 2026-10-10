@@ -1,9 +1,27 @@
 import { motion, AnimatePresence } from 'motion/react';
 import { MapPin, Navigation, Search, Layers, Compass, ShieldCheck, X, AlertCircle } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { getMultilingualAssistantResponse } from '../services/aiDetectionService';
 import { gpsService } from '../services/gpsService';
 import { adminData } from '../utils/adminData';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+
+const customIcon = new L.DivIcon({
+  className: 'custom-icon',
+  html: `<div style="background-color: #2563eb; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></div>`,
+  iconSize: [20, 20],
+  iconAnchor: [10, 10]
+});
+
+function MapRecenter({ center }: { center: [number, number] }) {
+  const map = useMap();
+  useEffect(() => {
+    map.setView(center);
+  }, [center, map]);
+  return null;
+}
 
 export default function AppMap() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -11,6 +29,27 @@ export default function AppMap() {
   const [routeAdvice, setRouteAdvice] = useState<string | null>(null);
   const [isJourneyActive, setIsJourneyActive] = useState(false);
   const [hasDeviation, setHasDeviation] = useState(false);
+  const [currentLocation, setCurrentLocation] = useState<[number, number]>([0, 0]);
+
+  useEffect(() => {
+    const watchId = gpsService.watchPosition((pos) => {
+      setCurrentLocation([pos.coords.latitude, pos.coords.longitude]);
+    }, undefined, { enableHighAccuracy: true });
+
+    // Initial fetch
+    gpsService.getCurrentPosition().then(pos => {
+      setCurrentLocation([pos.coords.latitude, pos.coords.longitude]);
+    }).catch(console.error);
+
+    return () => gpsService.clearWatch(watchId);
+  }, []);
+
+  const recenterMap = () => {
+    gpsService.getCurrentPosition().then(pos => {
+      setCurrentLocation([pos.coords.latitude, pos.coords.longitude]);
+    }).catch(console.error);
+  };
+
 
   const startJourney = () => {
     setIsJourneyActive(true);
@@ -60,12 +99,14 @@ export default function AppMap() {
         <h1 className="text-2xl font-bold text-slate-900">Live Tracking</h1>
         <div className="flex gap-2">
            <button 
+             onClick={() => alert('Map layers toggled')}
              aria-label="Map Layers"
              className="p-2 rounded-full bg-white shadow-sm border border-slate-100 text-slate-700 hover:bg-slate-50 transition-colors"
            >
              <Layers size={20} aria-hidden="true" />
            </button>
            <button 
+             onClick={() => alert('Compass calibrated')}
              aria-label="Compass"
              className="p-2 rounded-full bg-white shadow-sm border border-slate-100 text-slate-700 hover:bg-slate-50 transition-colors"
            >
@@ -149,7 +190,10 @@ export default function AppMap() {
               >
                 I'm Safe
               </button>
-              <button className="flex-1 py-3 rounded-2xl bg-white text-red-600 font-bold text-sm">
+              <button 
+                onClick={() => { alert('Emergency SOS Activated!'); setHasDeviation(false); }}
+                className="flex-1 py-3 rounded-2xl bg-white text-red-600 font-bold text-sm"
+              >
                 SOS
               </button>
             </div>
@@ -157,41 +201,31 @@ export default function AppMap() {
         )}
       </AnimatePresence>
 
-      {/* Simulated Map Container */}
-      <div 
-        role="application" 
-        aria-label="Interactive Safety Map"
-        className="flex-1 min-h-[400px] rounded-3xl bg-slate-200 relative overflow-hidden border-4 border-white shadow-lg"
-      >
-        {/* Grid Pattern for Map Feel */}
-        <div className="absolute inset-0 opacity-20" aria-hidden="true" style={{ backgroundImage: 'radial-gradient(#94a3b8 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
-        
-        {/* Simulated Paths */}
-        <svg className="absolute inset-0 w-full h-full opacity-30" aria-hidden="true">
-          <path d="M0 100 Q 100 80 200 150 T 400 120" stroke="#3b82f6" strokeWidth="4" fill="none" />
-          <path d="M50 0 L 150 400" stroke="#94a3b8" strokeWidth="2" fill="none" />
-          <path d="M0 300 H 400" stroke="#94a3b8" strokeWidth="2" fill="none" />
-        </svg>
-
-        {/* Current Location Marker */}
-        <motion.div 
-          animate={{ y: [0, -10, 0] }}
-          transition={{ repeat: Infinity, duration: 2 }}
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
-          aria-label="Your current location"
+      {/* Real Map Container */}
+      <div className="flex-1 min-h-[400px] h-[400px] rounded-3xl overflow-hidden border-4 border-white shadow-lg relative z-0">
+        <MapContainer 
+          center={currentLocation} 
+          zoom={15} 
+          className="h-full w-full"
+          zoomControl={false}
         >
-          <div className="relative">
-            <div className="absolute -inset-4 rounded-full bg-blue-500/20 animate-ping" aria-hidden="true" />
-            <div className="h-8 w-8 rounded-full bg-blue-600 border-4 border-white shadow-lg flex items-center justify-center text-white">
-              <MapPin size={16} aria-hidden="true" />
-            </div>
-          </div>
-        </motion.div>
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+          <Marker position={currentLocation} icon={customIcon}>
+            <Popup>
+              You are here.
+            </Popup>
+          </Marker>
+          <MapRecenter center={currentLocation} />
+        </MapContainer>
 
         {/* Floating Action Button for Recenter */}
         <button 
+          onClick={recenterMap}
           aria-label="Recenter Map"
-          className="absolute bottom-6 right-6 h-14 w-14 rounded-full bg-blue-600 text-white shadow-xl shadow-blue-200 flex items-center justify-center active:scale-90 transition-transform"
+          className="absolute bottom-6 right-6 z-[1000] h-14 w-14 rounded-full bg-blue-600 text-white shadow-xl shadow-blue-200 flex items-center justify-center active:scale-90 transition-transform"
         >
           <Navigation size={24} aria-hidden="true" />
         </button>
